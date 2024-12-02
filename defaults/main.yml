@@ -1,0 +1,4 @@
+---
+# defaults file for elasticsearch_install
+elasticsearch_version: "8.10.1"
+elastic_password: ""

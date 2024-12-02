@@ -1,0 +1,107 @@
+---
+# tasks file for elasticsearch_install
+- name: Check if repo already exists
+  ansible.builtin.stat:
+    path: /usr/share/keyrings/elasticsearch-keyring.gpg
+  register: __elasticsearch_apt_key
+
+- name: Check if repo already exists
+  ansible.builtin.stat:
+    path: /etc/apt/sources.list.d/elasticsearch.list
+  register: __elasticsearch_apt_source
+
+- name: Install the key
+  ansible.builtin.shell: "curl -fsSL https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg"
+  when: not __elasticsearch_apt_key.stat.exists
+
+- name: Install the repo
+  ansible.builtin.shell: "echo 'deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main' | sudo tee /etc/apt/sources.list.d/elasticsearch.list"
+  when: not __elasticsearch_apt_source.stat.exists
+  notify: update_apt_cache
+
+- ansible.builtin.meta: flush_handlers
+
+- name: Install elasticsearch packages
+  ansible.builtin.apt:
+    name: "elasticsearch={{ elasticsearch_version }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Hold elasticsearch packages
+  ansible.builtin.dpkg_selections:
+    name: elasticsearch
+    selection: hold
+
+- name: Ensure elasticsearch is started
+  ansible.builtin.service:
+    name: elasticsearch
+    state: started
+    enabled: true
+
+#####
+- name: Configure Elasticsearch
+  ansible.builtin.lineinfile:
+    path: /etc/elasticsearch/elasticsearch.yml
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  with_items:
+    - { regexp: '^#?xpack.security.enabled:', line: 'xpack.security.enabled: false' }
+    #- { regexp: '^#?xpack.security.http.ssl.enabled:', line: 'xpack.security.http.ssl.enabled: false' }
+    - { regexp: '^#?network.host:', line: 'network.host: 0.0.0.0' }
+    - { regexp: '^#?discovery.seed_hosts:', line: "discovery.seed_hosts: [{{ elastic_nodes | map('quote') | join(', ') }}]" }
+    - { regexp: '^#?cluster.initial_master_nodes:', line: "cluster.initial_master_nodes: [{{ elastic_nodes | map('quote') | join(', ') }}]" }
+  notify: restart elasticsearch
+
+# - name: Ensure Elasticsearch keystore exists
+#   command: "/usr/share/elasticsearch/bin/elasticsearch-keystore create"
+#   args:
+#     creates: "/etc/elasticsearch/elasticsearch.keystore"
+#   become: true
+#   become_user: elasticsearch
+
+# - name: Add bootstrap.password to Elasticsearch keystore
+#   command: "echo {{ elastic_password }} | /usr/share/elasticsearch/bin/elasticsearch-keystore add -x bootstrap.password"
+#   become: true
+#   become_user: elasticsearch
+
+- name: Configure JVM heap size
+  ansible.builtin.lineinfile:
+    path: /etc/elasticsearch/jvm.options
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  with_items:
+    - { regexp: '^#?-Xms', line: '-Xms1g' }
+    - { regexp: '^#?-Xmx', line: '-Xmx1g' }
+  notify:
+    - restart elasticsearch
+
+- name: Start and enable Elasticsearch service
+  ansible.builtin.systemd:
+    name: elasticsearch
+    state: started
+    enabled: yes
+
+- name: Verify Elasticsearch is running
+  wait_for:
+    port: 9200
+    delay: 10
+    timeout: 60
+    state: started
+
+# - name: Verify Elasticsearch is running
+#   ansible.builtin.uri:
+#     url: http://localhost:9200
+#     method: GET
+#     # user: elastic
+#     # password: "{{ elastic_password }}"
+#     status_code: 200
+#   retries: 10
+#   delay: 10
+#   register: elasticsearch_status
+#   until: elasticsearch_status.status == 200
+
+# - name: Debug Elasticsearch response
+#   debug:
+#     var: elasticsearch_status.content
