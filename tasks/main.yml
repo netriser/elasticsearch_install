@@ -1,6 +1,6 @@
 ---
 # tasks file for elasticsearch_install
-- name: Check if repo already exists
+- name: Check if gpg repo already exists
   ansible.builtin.stat:
     path: /usr/share/keyrings/elasticsearch-keyring.gpg
   register: __elasticsearch_apt_key
@@ -33,11 +33,11 @@
     name: elasticsearch
     selection: hold
 
-- name: Ensure elasticsearch is started
-  ansible.builtin.service:
-    name: elasticsearch
-    state: started
-    enabled: true
+# - name: Ensure elasticsearch is started
+#   ansible.builtin.service:
+#     name: elasticsearch
+#     state: started
+#     enabled: true
 
 #####
 - name: Configure Elasticsearch
@@ -72,8 +72,8 @@
     line: "{{ item.line }}"
     state: present
   with_items:
-    - { regexp: '^#?-Xms', line: '-Xms1g' }
-    - { regexp: '^#?-Xmx', line: '-Xmx1g' }
+    - { regexp: '^#?-Xms', line: '-Xms512m' }
+    - { regexp: '^#?-Xmx', line: '-Xmx512m' }
   notify:
     - restart elasticsearch
 
