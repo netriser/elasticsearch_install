@@ -2,30 +2,9 @@
 # tasks file for elasticsearch_install
 - name: Gather private IPs for all hosts
   set_fact:
-    elastic_nodes: "{{ groups['tag_Cluster_es_cluster'] | map('extract', hostvars, 'ansible_default_ipv4') | selectattr('address', 'defined') | map(attribute='address') | list }}"
+    elastic_nodes: "{{ groups['tag_app_elastic'] | map('extract', hostvars, 'ansible_default_ipv4') | selectattr('address', 'defined') | map(attribute='address') | list }}"
   delegate_to: localhost
   run_once: true
-
-- name: Check if gpg repo already exists
-  ansible.builtin.stat:
-    path: /usr/share/keyrings/elasticsearch-keyring.gpg
-  register: __elasticsearch_apt_key
-
-- name: Check if repo already exists
-  ansible.builtin.stat:
-    path: /etc/apt/sources.list.d/elasticsearch.list
-  register: __elasticsearch_apt_source
-
-- name: Install the key
-  ansible.builtin.shell: "curl -fsSL https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg"
-  when: not __elasticsearch_apt_key.stat.exists
-
-- name: Install the repo
-  ansible.builtin.shell: "echo 'deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main' | sudo tee /etc/apt/sources.list.d/elasticsearch.list"
-  when: not __elasticsearch_apt_source.stat.exists
-  notify: update_apt_cache
-
-- ansible.builtin.meta: flush_handlers
 
 - name: Install elasticsearch packages
   ansible.builtin.apt:
@@ -98,7 +77,7 @@
 
 - name: Verify Elasticsearch curl output
   ansible.builtin.uri:
-    url: http://localhost:9200
+    url: http://localhost:9200/_cluster/health?pretty=true
     method: GET
     # user: elastic
     # password: "{{ elastic_password }}"
@@ -110,4 +89,4 @@
 
 - name: Debug Elasticsearch response
   debug:
-    var: "{{ elasticsearch_status.content }}"
+    var: elasticsearch_status.content
