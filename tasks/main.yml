@@ -5,7 +5,7 @@
     elastic_nodes: "{{ groups['tag_Cluster_es_cluster'] | map('extract', hostvars, 'ansible_default_ipv4') | selectattr('address', 'defined') | map(attribute='address') | list }}"
   delegate_to: localhost
   run_once: true
-  
+
 - name: Check if gpg repo already exists
   ansible.builtin.stat:
     path: /usr/share/keyrings/elasticsearch-keyring.gpg
@@ -96,18 +96,18 @@
     timeout: 60
     state: started
 
-# - name: Verify Elasticsearch is running
-#   ansible.builtin.uri:
-#     url: http://localhost:9200
-#     method: GET
-#     # user: elastic
-#     # password: "{{ elastic_password }}"
-#     status_code: 200
-#   retries: 10
-#   delay: 10
-#   register: elasticsearch_status
-#   until: elasticsearch_status.status == 200
+- name: Verify Elasticsearch is running
+  ansible.builtin.uri:
+    url: http://localhost:9200
+    method: GET
+    # user: elastic
+    # password: "{{ elastic_password }}"
+    status_code: 200
+  retries: 10
+  delay: 10
+  register: elasticsearch_status
+  until: elasticsearch_status.status == 200
 
-# - name: Debug Elasticsearch response
-#   debug:
-#     var: elasticsearch_status.content
+- name: Debug Elasticsearch response
+  debug:
+    var: elasticsearch_status.content
